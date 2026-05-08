@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:pumpkin",
+    "minecraft:melon_slice",
+    "minecraft:sugar_cane",
+    "minecraft:cocoa_beans",
+    "minecraft:nether_wart"
+  ]
+}

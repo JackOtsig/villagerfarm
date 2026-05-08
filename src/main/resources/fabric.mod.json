@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "villagerfarm",
+  "version": "${version}",
+  "name": "Villager Farm",
+  "description": "Splits villager farming off the mobGriefing gamerule and makes harvest+replant atomic. Adds farming for sugar cane, nether wart, pumpkin, melon, and cocoa.",
+  "authors": ["JackOtsig"],
+  "contact": {
+    "homepage": "https://github.com/JackOtsig/villagerfarm",
+    "sources": "https://github.com/JackOtsig/villagerfarm",
+    "issues": "https://github.com/JackOtsig/villagerfarm/issues"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["farm.jack.villagerfarm.VillagerFarmMod"],
+    "jade": ["farm.jack.villagerfarm.tooltip.jade.VillagerJadePlugin"]
+  },
+  "mixins": ["villagerfarm.mixins.json"],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "blockorigin": ">=0.1.0-dev",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21"
+  },
+  "recommends": {
+    "jade": "*",
+    "wthit": "*"
+  }
+}

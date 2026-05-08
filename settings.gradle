@@ -1,0 +1,17 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'villagerfarm'
+
+includeBuild('../mcblockorigin') {
+    dependencySubstitution {
+        substitute module('origin.jack:blockorigin') using project(':')
+    }
+}

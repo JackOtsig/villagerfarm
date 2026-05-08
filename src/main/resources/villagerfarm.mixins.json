@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "farm.jack.villagerfarm.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "FarmerVillagerTaskMixin",
+    "FarmlandBlockMixin",
+    "GatherItemsVillagerTaskMixin",
+    "MobEntityMixin",
+    "VillagerEntityLootMixin",
+    "VillagerFoodAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

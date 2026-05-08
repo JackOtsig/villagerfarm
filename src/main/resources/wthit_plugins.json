@@ -1,0 +1,9 @@
+{
+  "villagerfarm:plugin": {
+    "entrypoints": {
+      "common": "farm.jack.villagerfarm.tooltip.wthit.VillagerWthitCommonPlugin",
+      "client": "farm.jack.villagerfarm.tooltip.wthit.VillagerWthitClientPlugin"
+    },
+    "side": "*"
+  }
+}
