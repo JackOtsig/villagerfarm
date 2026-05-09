@@ -1,5 +1,6 @@
 package farm.jack.villagerfarm;
 
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -21,27 +22,31 @@ import java.util.List;
  * for that. Farmers next to soul-sand wart farms or jungle-log cocoa farms have
  * an empty SECONDARY_JOB_SITE forever, so vanilla never gates them in.
  *
- * <p>Every 40 ticks, this scans ±4 around each farmer villager. If no
- * SECONDARY_JOB_SITE is set and we find one of our extended-crop substrates,
- * we plant a fake one so the brain unblocks the task.
+ * <p>Periodically scans around each farmer villager and plants a fake
+ * SECONDARY_JOB_SITE pointing at any of our extended-crop substrates so the
+ * brain unblocks the task. Search radii and tick interval come from config.
  */
 public final class SecondaryJobSitePatcher {
     private SecondaryJobSitePatcher() {}
 
     public static void install() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (server.getTicks() % 40 != 0) return;
+            VillagerFarmConfig cfg = VillagerFarmConfig.INSTANCE;
+            if (!cfg.features.secondary_job_site_patcher) return;
+            int interval = Math.max(1, cfg.values.search.secondary_job_site_tick_interval);
+            if (server.getTicks() % interval != 0) return;
+            int radiusXz = cfg.values.search.secondary_job_site_radius_xz;
+            int radiusY = cfg.values.search.secondary_job_site_radius_y;
             for (ServerWorld world : server.getWorlds()) {
-                if (!world.getGameRules().getValue(ModGamerules.VILLAGER_EXTENDED_FARMING)) continue;
                 for (Entity e : world.iterateEntities()) {
                     if (!(e instanceof VillagerEntity v)) continue;
                     if (!v.getVillagerData().profession().matchesKey(VillagerProfession.FARMER)) continue;
                     Brain<VillagerEntity> brain = v.getBrain();
                     if (brain.getOptionalRegisteredMemory(MemoryModuleType.SECONDARY_JOB_SITE)
                             .filter(list -> !list.isEmpty()).isPresent()) {
-                        continue;  // vanilla already populated it
+                        continue;
                     }
-                    BlockPos found = findExtendedSubstrate(world, v.getBlockPos());
+                    BlockPos found = findExtendedSubstrate(world, v.getBlockPos(), radiusXz, radiusY);
                     if (found != null) {
                         brain.remember(MemoryModuleType.SECONDARY_JOB_SITE,
                                 List.of(GlobalPos.create(world.getRegistryKey(), found)));
@@ -51,11 +56,11 @@ public final class SecondaryJobSitePatcher {
         });
     }
 
-    private static BlockPos findExtendedSubstrate(ServerWorld world, BlockPos center) {
+    private static BlockPos findExtendedSubstrate(ServerWorld world, BlockPos center, int radiusXz, int radiusY) {
         BlockPos.Mutable cursor = new BlockPos.Mutable();
-        for (int dx = -4; dx <= 4; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -4; dz <= 4; dz++) {
+        for (int dx = -radiusXz; dx <= radiusXz; dx++) {
+            for (int dy = -radiusY; dy <= radiusY; dy++) {
+                for (int dz = -radiusXz; dz <= radiusXz; dz++) {
                     cursor.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
                     BlockState s = world.getBlockState(cursor);
                     if (s.isOf(Blocks.SOUL_SAND)

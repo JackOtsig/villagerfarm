@@ -1,7 +1,4 @@
 {
-  "gamerule.villagerFarming": "Villagers can farm (harvest, replant, pickup)",
-  "gamerule.villagerExtendedFarming": "Villagers harvest sugar cane, nether wart, pumpkin, melon, and cocoa",
-
   "villagerfarm.tooltip.activity.work": "Working",
   "villagerfarm.tooltip.activity.rest": "Resting",
   "villagerfarm.tooltip.activity.meet": "Meeting",

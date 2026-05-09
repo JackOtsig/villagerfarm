@@ -1,5 +1,6 @@
 package farm.jack.villagerfarm.tooltip.wthit;
 
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import farm.jack.villagerfarm.tooltip.VillagerTooltipData;
 import mcp.mobius.waila.api.IDataProvider;
 import mcp.mobius.waila.api.IDataWriter;
@@ -14,6 +15,7 @@ public final class VillagerWthitDataProvider implements IDataProvider<VillagerEn
 
     @Override
     public void appendData(IDataWriter data, IServerAccessor<VillagerEntity> accessor, IPluginConfig config) {
+        if (!VillagerFarmConfig.INSTANCE.features.tooltip_integration) return;
         VillagerTooltipData.write(data.raw(), accessor.getTarget(), accessor.getLevel().getRegistryManager());
     }
 }

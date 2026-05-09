@@ -1,5 +1,6 @@
 package farm.jack.villagerfarm;
 
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +11,7 @@ public final class VillagerFarmMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        ModGamerules.init();
+        VillagerFarmConfig.loadOrCreate();
         VillagerFoodPatcher.install();
         SecondaryJobSitePatcher.install();
         LOGGER.info("Villager Farm initialized");

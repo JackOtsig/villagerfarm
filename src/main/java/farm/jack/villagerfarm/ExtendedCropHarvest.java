@@ -1,5 +1,6 @@
 package farm.jack.villagerfarm;
 
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -26,27 +27,28 @@ import java.util.List;
  * <p>Pumpkin and melon use blockorigin's {@link BlockCause#RANDOM_TICK_GROW} stamp
  * to distinguish stem-grown fruit (harvestable) from player-placed decorations
  * (skipped). The other three are assumed planted-for-farming whenever they're
- * in a mature state.
+ * in a mature state. Per-crop toggles live in {@code features.extended_crops}.
  */
 public final class ExtendedCropHarvest {
     private ExtendedCropHarvest() {}
 
     /** True when a villager should select this position as a farm target. */
     public static boolean isHarvestableExtended(BlockState state, ServerWorld world, BlockPos pos) {
+        VillagerFarmConfig.ExtendedCrops cfg = VillagerFarmConfig.INSTANCE.features.extended_crops;
         if (state.isOf(Blocks.SUGAR_CANE)) {
-            // Target only stalks that have another stalk BELOW them. Walking
-            // upward from such a stalk and breaking everything always leaves
-            // the bottom stalk in place to regrow.
-            return world.getBlockState(pos.down()).isOf(Blocks.SUGAR_CANE);
+            return cfg.sugar_cane && world.getBlockState(pos.down()).isOf(Blocks.SUGAR_CANE);
         }
         if (state.getBlock() instanceof NetherWartBlock) {
-            return state.get(NetherWartBlock.AGE) == NetherWartBlock.MAX_AGE;
+            return cfg.nether_wart && state.get(NetherWartBlock.AGE) == NetherWartBlock.MAX_AGE;
         }
         if (state.getBlock() instanceof CocoaBlock) {
-            return state.get(CocoaBlock.AGE) == CocoaBlock.MAX_AGE;
+            return cfg.cocoa && state.get(CocoaBlock.AGE) == CocoaBlock.MAX_AGE;
         }
-        if (state.isOf(Blocks.PUMPKIN) || state.isOf(Blocks.MELON)) {
-            return BlockOrigin.get(world, pos) == BlockCause.RANDOM_TICK_GROW;
+        if (state.isOf(Blocks.PUMPKIN)) {
+            return cfg.pumpkin && BlockOrigin.get(world, pos) == BlockCause.RANDOM_TICK_GROW;
+        }
+        if (state.isOf(Blocks.MELON)) {
+            return cfg.melon && BlockOrigin.get(world, pos) == BlockCause.RANDOM_TICK_GROW;
         }
         return false;
     }
@@ -99,10 +101,6 @@ public final class ExtendedCropHarvest {
         emitBreakFx(world, pos, state, breaker);
     }
 
-    /**
-     * Roll the crop's loot table and drop the items, optionally consuming one of
-     * {@code consumeOne}'s item to represent the seed left in the ground.
-     */
     private static void dropCropLoot(ServerWorld world, BlockPos pos, BlockState state, Entity breaker,
                                      ItemStack consumeOne) {
         LootWorldContext.Builder ctx = new LootWorldContext.Builder(world)

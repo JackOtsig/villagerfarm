@@ -1,8 +1,8 @@
 package farm.jack.villagerfarm.mixin;
 
 import farm.jack.villagerfarm.ExtendedCropHarvest;
-import farm.jack.villagerfarm.ModGamerules;
 import farm.jack.villagerfarm.VillagerFarmHelper;
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.CropBlock;
 import net.minecraft.entity.Entity;
@@ -18,7 +18,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -33,21 +32,35 @@ public abstract class FarmerVillagerTaskMixin {
     @Shadow @Final private List<BlockPos> targetPositions;
     @Shadow @Nullable private BlockPos chooseRandomTarget(ServerWorld world) { throw new AssertionError(); }
 
-    /** Swap mob_griefing for villager_farming when the task gates its start. */
-    @ModifyArg(
+    /**
+     * When {@code features.gamerule_split} is on, bypass vanilla's
+     * {@code mob_griefing} check inside {@code shouldRun} and always allow the
+     * task to start. When off, defer to vanilla.
+     */
+    @Redirect(
             method = "shouldRun(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/passive/VillagerEntity;)Z",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/world/rule/GameRules;getValue(Lnet/minecraft/world/rule/GameRule;)Ljava/lang/Object;"))
-    private GameRule<?> villagerfarm$swapStartRule(GameRule<?> original) {
-        return original == GameRules.DO_MOB_GRIEFING ? ModGamerules.VILLAGER_FARMING : original;
+    private Object villagerfarm$bypassStartRule(GameRules rules, GameRule<?> rule) {
+        if (rule == GameRules.DO_MOB_GRIEFING && VillagerFarmConfig.INSTANCE.features.gamerule_split) {
+            return Boolean.TRUE;
+        }
+        return rules.getValue(rule);
     }
 
-    /** Replace vanilla harvest-then-replant for wheat/beetroot/potato/carrot with our atomic version. */
+    /**
+     * Replace vanilla harvest-then-replant for wheat/beetroot/potato/carrot
+     * with our atomic version. When {@code features.atomic_harvest_replant} is
+     * off, fall back to vanilla.
+     */
     @Redirect(
             method = "keepRunning(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/passive/VillagerEntity;J)V",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/server/world/ServerWorld;breakBlock(Lnet/minecraft/util/math/BlockPos;ZLnet/minecraft/entity/Entity;)Z"))
     private boolean villagerfarm$breakAndReplant(ServerWorld world, BlockPos pos, boolean drop, Entity breaker) {
+        if (!VillagerFarmConfig.INSTANCE.features.atomic_harvest_replant) {
+            return world.breakBlock(pos, drop, breaker);
+        }
         return VillagerFarmHelper.breakAndReplant(world, pos, breaker);
     }
 
@@ -58,7 +71,7 @@ public abstract class FarmerVillagerTaskMixin {
     private void villagerfarm$expandTargets(BlockPos pos, ServerWorld world,
                                             CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValueZ()) return;
-        if (!world.getGameRules().getValue(ModGamerules.VILLAGER_EXTENDED_FARMING)) return;
+        if (!VillagerFarmConfig.INSTANCE.features.extended_crops.enabled) return;
         BlockState state = world.getBlockState(pos);
         if (ExtendedCropHarvest.isHarvestableExtended(state, world, pos)) {
             cir.setReturnValue(true);
@@ -66,12 +79,10 @@ public abstract class FarmerVillagerTaskMixin {
     }
 
     /**
-     * Vanilla's 3×3×3 scan only fires during a brain re-evaluation, and only
-     * looks at blocks within ±1 of the villager. Cane/wart/cocoa/pumpkin/melon
-     * setups frequently sit just outside that box (e.g. cocoa stacked vertically
-     * on a log, or a wart farm a couple blocks from the composter). Extend the
-     * scan to ±2 for extended-crop positions only — we add the new candidates
-     * just before vanilla picks a random target, so the picker considers them.
+     * Vanilla's 3×3×3 scan only fires during a brain re-evaluation. Cane / wart
+     * / cocoa / pumpkin / melon setups frequently sit just outside that box, so
+     * we extend it by {@code values.search.extended_radius_xyz} (default ±2) for
+     * extended-crop positions only.
      */
     @Inject(method = "shouldRun(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/passive/VillagerEntity;)Z",
             at = @At(value = "INVOKE",
@@ -79,14 +90,16 @@ public abstract class FarmerVillagerTaskMixin {
                     shift = At.Shift.BEFORE))
     private void villagerfarm$expandedScan(ServerWorld world, VillagerEntity villager,
                                            CallbackInfoReturnable<Boolean> cir) {
-        if (!world.getGameRules().getValue(ModGamerules.VILLAGER_EXTENDED_FARMING)) return;
+        VillagerFarmConfig cfg = VillagerFarmConfig.INSTANCE;
+        if (!cfg.features.extended_crops.enabled) return;
+        int radius = Math.max(1, cfg.values.search.extended_radius_xyz);
         BlockPos.Mutable cursor = new BlockPos.Mutable();
         int vx = villager.getBlockX();
         int vy = villager.getBlockY();
         int vz = villager.getBlockZ();
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -2; dz <= 2; dz++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
                     if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && Math.abs(dz) <= 1) continue;
                     cursor.set(vx + dx, vy + dy, vz + dz);
                     BlockState state = world.getBlockState(cursor);
@@ -99,11 +112,10 @@ public abstract class FarmerVillagerTaskMixin {
     }
 
     /**
-     * Handle the harvest for extended crops; vanilla's CropBlock branch will
-     * skip them. We use a wider 4.0 reach (vs vanilla's strict 1.0) since the
-     * ±2 scan can pick up corner targets at √12 ≈ 3.46. The unstuck-fallback
-     * also catches mature CropBlocks the villager can't reach within vanilla's
-     * tight 1.0² so the brain doesn't lock onto an unreachable wheat block.
+     * Harvest extended crops with a configurable wider reach (default
+     * {@code 4.0}, sq=16). Also unstucks vanilla CropBlock targets in
+     * {@code [unstuck_min, unstuck_max)} squared distance so the brain doesn't
+     * lock onto an unreachable wheat block.
      */
     @Inject(method = "keepRunning(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/passive/VillagerEntity;J)V",
             at = @At("HEAD"),
@@ -114,12 +126,13 @@ public abstract class FarmerVillagerTaskMixin {
         if (target == null) return;
         if (time <= this.nextResponseTime) return;
 
+        VillagerFarmConfig cfg = VillagerFarmConfig.INSTANCE;
         double distSq = target.getSquaredDistance(villager.getEntityPos());
         BlockState state = world.getBlockState(target);
-        boolean extendedOn = world.getGameRules().getValue(ModGamerules.VILLAGER_EXTENDED_FARMING);
 
-        if (extendedOn && ExtendedCropHarvest.isHarvestableExtended(state, world, target)) {
-            if (distSq >= 16.0) return;
+        if (cfg.features.extended_crops.enabled
+                && ExtendedCropHarvest.isHarvestableExtended(state, world, target)) {
+            if (distSq >= cfg.values.search.extended_harvest_distance_squared) return;
             if (ExtendedCropHarvest.tryHarvest(world, target, state, villager)) {
                 this.targetPositions.remove(target);
                 this.currentTarget = chooseRandomTarget(world);
@@ -129,7 +142,9 @@ public abstract class FarmerVillagerTaskMixin {
             return;
         }
 
-        if (distSq >= 1.0 && distSq < 6.25
+        if (cfg.features.atomic_harvest_replant
+                && distSq >= cfg.values.search.unstuck_min_distance_squared
+                && distSq < cfg.values.search.unstuck_max_distance_squared
                 && state.getBlock() instanceof CropBlock crop && crop.isMature(state)) {
             VillagerFarmHelper.breakAndReplant(world, target, villager);
             this.targetPositions.remove(target);

@@ -1,6 +1,7 @@
 package farm.jack.villagerfarm.tooltip.jade;
 
 import farm.jack.villagerfarm.VillagerFarmMod;
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import farm.jack.villagerfarm.tooltip.VillagerTooltipData;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.nbt.NbtCompound;
@@ -16,6 +17,7 @@ public final class VillagerJadeDataProvider implements IServerDataProvider<Entit
 
     @Override
     public void appendServerData(NbtCompound tag, EntityAccessor accessor) {
+        if (!VillagerFarmConfig.INSTANCE.features.tooltip_integration) return;
         if (!(accessor.getEntity() instanceof VillagerEntity villager)) return;
         VillagerTooltipData.write(tag, villager, accessor.getLevel().getRegistryManager());
     }

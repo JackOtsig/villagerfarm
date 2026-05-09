@@ -1,68 +1,69 @@
 package farm.jack.villagerfarm;
 
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
+import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Identifier;
 import net.minecraft.village.VillagerProfession;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Status-effect rewards triggered when a villager picks up one of the new
  * crops. Sugar cane and cocoa beans extend a timer per item consumed; nether
- * wart, when the picker is a cleric and the gamerule is on, applies one
- * random effect from a curated villager-safe list.
+ * wart, when the picker is a cleric (configurable) and the feature is on,
+ * applies one random effect from a configured list.
  */
 public final class PickupEffects {
     private PickupEffects() {}
 
-    private static final int CANE_TICKS_PER_ITEM = 200;     // 10s
-    private static final int COCOA_TICKS_PER_ITEM = 100;    // 5s
-    private static final int WART_EFFECT_TICKS = 600;       // 30s
-
-    private static final List<RegistryEntry<StatusEffect>> WART_POOL = List.of(
-            StatusEffects.SPEED,
-            StatusEffects.HASTE,
-            StatusEffects.STRENGTH,
-            StatusEffects.JUMP_BOOST,
-            StatusEffects.REGENERATION,
-            StatusEffects.RESISTANCE,
-            StatusEffects.FIRE_RESISTANCE,
-            StatusEffects.WATER_BREATHING,
-            StatusEffects.ABSORPTION,
-            StatusEffects.HEALTH_BOOST,
-            StatusEffects.SLOW_FALLING
-    );
-
     public static void onVillagerPickup(VillagerEntity villager, Item item, int consumed) {
         if (consumed <= 0) return;
+        VillagerFarmConfig cfg = VillagerFarmConfig.INSTANCE;
 
         if (item == Items.SUGAR_CANE) {
-            extend(villager, StatusEffects.SPEED, consumed * CANE_TICKS_PER_ITEM);
+            VillagerFarmConfig.StackingEffect e = cfg.features.pickup_effects.sugar_cane;
+            if (!e.enabled) return;
+            extend(villager, StatusEffects.SPEED, consumed * e.ticks_per_item, e.amplifier);
             return;
         }
         if (item == Items.COCOA_BEANS) {
-            extend(villager, StatusEffects.REGENERATION, consumed * COCOA_TICKS_PER_ITEM);
+            VillagerFarmConfig.StackingEffect e = cfg.features.pickup_effects.cocoa_beans;
+            if (!e.enabled) return;
+            extend(villager, StatusEffects.REGENERATION, consumed * e.ticks_per_item, e.amplifier);
             return;
         }
         if (item == Items.NETHER_WART) {
-            ServerWorld sw = (ServerWorld) villager.getEntityWorld();
-            if (!sw.getGameRules().getValue(ModGamerules.VILLAGER_EXTENDED_FARMING)) return;
-            if (!villager.getVillagerData().profession().matchesKey(VillagerProfession.CLERIC)) return;
-            RegistryEntry<StatusEffect> rolled = WART_POOL.get(villager.getRandom().nextInt(WART_POOL.size()));
-            extend(villager, rolled, WART_EFFECT_TICKS);
+            VillagerFarmConfig.WartEffect w = cfg.features.pickup_effects.nether_wart;
+            if (!w.enabled) return;
+            if (w.cleric_only && !villager.getVillagerData().profession().matchesKey(VillagerProfession.CLERIC)) return;
+            List<RegistryEntry<StatusEffect>> pool = resolvePool(w.allowed_effects);
+            if (pool.isEmpty()) return;
+            RegistryEntry<StatusEffect> rolled = pool.get(villager.getRandom().nextInt(pool.size()));
+            extend(villager, rolled, w.duration_ticks, w.amplifier);
         }
     }
 
-    /** Extend (or set) the level-I duration of {@code effect} by {@code addTicks}. */
-    private static void extend(VillagerEntity villager, RegistryEntry<StatusEffect> effect, int addTicks) {
+    private static void extend(VillagerEntity villager, RegistryEntry<StatusEffect> effect, int addTicks, int amplifier) {
         StatusEffectInstance current = villager.getStatusEffect(effect);
-        int total = (current != null && current.getAmplifier() == 0) ? current.getDuration() + addTicks : addTicks;
-        villager.addStatusEffect(new StatusEffectInstance(effect, total, 0, false, true, true));
+        int total = (current != null && current.getAmplifier() == amplifier) ? current.getDuration() + addTicks : addTicks;
+        villager.addStatusEffect(new StatusEffectInstance(effect, total, amplifier, false, true, true));
+    }
+
+    private static List<RegistryEntry<StatusEffect>> resolvePool(List<String> ids) {
+        List<RegistryEntry<StatusEffect>> out = new ArrayList<>(ids.size());
+        for (String s : ids) {
+            Identifier id = Identifier.tryParse(s);
+            if (id == null) continue;
+            Registries.STATUS_EFFECT.getEntry(id).ifPresent(out::add);
+        }
+        return out;
     }
 }

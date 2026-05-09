@@ -1,6 +1,6 @@
 package farm.jack.villagerfarm.mixin;
 
-import farm.jack.villagerfarm.ModGamerules;
+import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.brain.MemoryModuleType;
 import net.minecraft.entity.ai.brain.task.GatherItemsVillagerTask;
@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,21 +26,21 @@ import java.util.Optional;
  * silently no-ops unless a slot has {@code count > 24} or {@code count >
  * maxCount/2} — too high a bar for low-yield crops villagers eat down to keep
  * their food level. We toss directly via {@link TargetUtil#give} as soon as a
- * stack has at least 2 items so the new crops actually circulate.
+ * stack has at least {@code values.sharing.min_stack_size_to_toss} items, so
+ * the new crops actually circulate.
  *
- * <p>Pumpkin, melon slices, sugar cane, and cocoa beans are tossed by any
- * farmer to any meeting partner. Nether wart is restricted to farmer→cleric.
+ * <p>Each item type is independently toggleable via
+ * {@code features.food_sharing}. Wart still goes only farmer→cleric (when
+ * {@code share_nether_wart_to_cleric} is on).
  */
 @Mixin(GatherItemsVillagerTask.class)
 public abstract class GatherItemsVillagerTaskMixin {
 
-    private static final List<Item> SHARE_ANY_TARGET = List.of(
-            Items.PUMPKIN, Items.MELON_SLICE, Items.SUGAR_CANE, Items.COCOA_BEANS);
-
     @Inject(method = "keepRunning(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/passive/VillagerEntity;J)V",
             at = @At("RETURN"))
     private void villagerfarm$shareNewCrops(ServerWorld world, VillagerEntity self, long time, CallbackInfo ci) {
-        if (!world.getGameRules().getValue(ModGamerules.VILLAGER_EXTENDED_FARMING)) return;
+        VillagerFarmConfig cfg = VillagerFarmConfig.INSTANCE;
+        if (!cfg.features.food_sharing.enabled) return;
         if (!self.getVillagerData().profession().matchesKey(VillagerProfession.FARMER)) return;
 
         Optional<VillagerEntity> targetOpt = self.getBrain()
@@ -48,24 +49,31 @@ public abstract class GatherItemsVillagerTaskMixin {
                 .map(t -> (VillagerEntity) t);
         if (targetOpt.isEmpty()) return;
         VillagerEntity target = targetOpt.get();
-        if (self.squaredDistanceTo(target) > 5.0) return;
+        if (self.squaredDistanceTo(target) > cfg.values.sharing.max_share_distance_squared) return;
 
-        // Wart only goes to clerics.
-        if (target.getVillagerData().profession().matchesKey(VillagerProfession.CLERIC)
-                && tossHalf(self, Items.NETHER_WART, target)) {
+        int minToToss = Math.max(2, cfg.values.sharing.min_stack_size_to_toss);
+
+        if (cfg.features.food_sharing.share_nether_wart_to_cleric
+                && target.getVillagerData().profession().matchesKey(VillagerProfession.CLERIC)
+                && tossHalf(self, Items.NETHER_WART, target, minToToss)) {
             return;
         }
-        // Pumpkin / melon / cane / cocoa go to any meeting villager.
-        for (Item item : SHARE_ANY_TARGET) {
-            if (tossHalf(self, item, target)) return;
+
+        List<Item> pool = new ArrayList<>(4);
+        if (cfg.features.food_sharing.share_pumpkin) pool.add(Items.PUMPKIN);
+        if (cfg.features.food_sharing.share_melon_slice) pool.add(Items.MELON_SLICE);
+        if (cfg.features.food_sharing.share_sugar_cane) pool.add(Items.SUGAR_CANE);
+        if (cfg.features.food_sharing.share_cocoa_beans) pool.add(Items.COCOA_BEANS);
+        for (Item item : pool) {
+            if (tossHalf(self, item, target, minToToss)) return;
         }
     }
 
-    private static boolean tossHalf(VillagerEntity self, Item item, LivingEntity target) {
+    private static boolean tossHalf(VillagerEntity self, Item item, LivingEntity target, int minToToss) {
         SimpleInventory inv = self.getInventory();
         for (int i = 0; i < inv.size(); i++) {
             ItemStack s = inv.getStack(i);
-            if (s.isOf(item) && s.getCount() >= 2) {
+            if (s.isOf(item) && s.getCount() >= minToToss) {
                 int n = s.getCount() / 2;
                 ItemStack thrown = new ItemStack(item, n);
                 s.decrement(n);
