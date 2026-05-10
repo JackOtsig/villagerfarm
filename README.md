@@ -41,10 +41,11 @@ The schema is a single JSON object with two top-level sections:
 | `extended_crops.sugar_cane / nether_wart / cocoa / pumpkin / melon` | `true` | Per-crop toggles, layered under the master switch. |
 | `food_sharing.enabled` | `true` | Master switch for the custom low-threshold share path. |
 | `food_sharing.share_pumpkin / share_melon_slice / share_sugar_cane / share_cocoa_beans / share_nether_wart_to_cleric` | `true` | Per-item share toggles. Wart is farmer→cleric only when its toggle is on. |
-| `pickup_effects.sugar_cane.enabled` | `true` | Speed effect on sugar-cane pickup. |
+| `pickup_effects.sugar_cane.enabled` | `true` | Effect on sugar-cane pickup. |
+| `pickup_effects.sugar_cane.effect` | `"minecraft:speed"` | Status effect identifier rolled. Any vanilla/modded effect id works. |
 | `pickup_effects.sugar_cane.ticks_per_item` | `200` | Ticks added per cane (20t/s, so 200 = 10s). |
 | `pickup_effects.sugar_cane.amplifier` | `0` | 0 = level I, 1 = level II, etc. |
-| `pickup_effects.cocoa_beans.*` | `true / 100 / 0` | Regen effect on cocoa pickup, 5s/bean by default. |
+| `pickup_effects.cocoa_beans.*` | `true / "minecraft:regeneration" / 100 / 0` | Same shape as sugar cane, 5s/bean of Regen by default. |
 | `pickup_effects.nether_wart.enabled` | `true` | Random positive effect on nether-wart pickup. |
 | `pickup_effects.nether_wart.cleric_only` | `true` | Only fires for cleric villagers. |
 | `pickup_effects.nether_wart.duration_ticks` | `600` | 30 seconds at 20 t/s. |

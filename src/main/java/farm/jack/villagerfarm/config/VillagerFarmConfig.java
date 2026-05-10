@@ -63,20 +63,22 @@ public final class VillagerFarmConfig {
     }
 
     public static final class PickupEffectsConfig {
-        public StackingEffect sugar_cane = new StackingEffect(true, 200, 0);
-        public StackingEffect cocoa_beans = new StackingEffect(true, 100, 0);
+        public StackingEffect sugar_cane = new StackingEffect(true, "minecraft:speed", 200, 0);
+        public StackingEffect cocoa_beans = new StackingEffect(true, "minecraft:regeneration", 100, 0);
         public WartEffect nether_wart = new WartEffect();
     }
 
     public static final class StackingEffect {
         public boolean enabled;
+        public String effect;
         public int ticks_per_item;
         public int amplifier;
 
         public StackingEffect() {}
 
-        public StackingEffect(boolean enabled, int ticks_per_item, int amplifier) {
+        public StackingEffect(boolean enabled, String effect, int ticks_per_item, int amplifier) {
             this.enabled = enabled;
+            this.effect = effect;
             this.ticks_per_item = ticks_per_item;
             this.amplifier = amplifier;
         }

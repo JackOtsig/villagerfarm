@@ -3,7 +3,6 @@ package farm.jack.villagerfarm;
 import farm.jack.villagerfarm.config.VillagerFarmConfig;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
@@ -29,15 +28,11 @@ public final class PickupEffects {
         VillagerFarmConfig cfg = VillagerFarmConfig.INSTANCE;
 
         if (item == Items.SUGAR_CANE) {
-            VillagerFarmConfig.StackingEffect e = cfg.features.pickup_effects.sugar_cane;
-            if (!e.enabled) return;
-            extend(villager, StatusEffects.SPEED, consumed * e.ticks_per_item, e.amplifier);
+            applyStackingEffect(villager, cfg.features.pickup_effects.sugar_cane, consumed);
             return;
         }
         if (item == Items.COCOA_BEANS) {
-            VillagerFarmConfig.StackingEffect e = cfg.features.pickup_effects.cocoa_beans;
-            if (!e.enabled) return;
-            extend(villager, StatusEffects.REGENERATION, consumed * e.ticks_per_item, e.amplifier);
+            applyStackingEffect(villager, cfg.features.pickup_effects.cocoa_beans, consumed);
             return;
         }
         if (item == Items.NETHER_WART) {
@@ -49,6 +44,15 @@ public final class PickupEffects {
             RegistryEntry<StatusEffect> rolled = pool.get(villager.getRandom().nextInt(pool.size()));
             extend(villager, rolled, w.duration_ticks, w.amplifier);
         }
+    }
+
+    private static void applyStackingEffect(VillagerEntity villager, VillagerFarmConfig.StackingEffect cfg, int consumed) {
+        if (!cfg.enabled) return;
+        Identifier id = Identifier.tryParse(cfg.effect);
+        if (id == null) return;
+        RegistryEntry<StatusEffect> effect = Registries.STATUS_EFFECT.getEntry(id).orElse(null);
+        if (effect == null) return;
+        extend(villager, effect, consumed * cfg.ticks_per_item, cfg.amplifier);
     }
 
     private static void extend(VillagerEntity villager, RegistryEntry<StatusEffect> effect, int addTicks, int amplifier) {
